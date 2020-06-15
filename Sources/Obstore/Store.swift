@@ -25,7 +25,7 @@ public final class Store<Value: Identifiable> {
         }
     }
     
-    public func value(of id: Value.ID) throws -> Observed<Value>? {
+    public func value(for id: Value.ID) throws -> Observed<Value>? {
         try queue.sync {
             if let weakValue = observedValues[id] {
                 if let value = weakValue.value {
@@ -43,9 +43,9 @@ public final class Store<Value: Identifiable> {
         }
     }
     
-    public func values<IDS: Collection>(of ids: IDS) throws -> Observed<[Value]> where IDS.Element == Value.ID {
+    public func values<IDS: Collection>(for ids: IDS) throws -> Observed<[Value]> where IDS.Element == Value.ID {
         try queue.sync {
-            let observedValues: [Observed<Value>] = try ids.compactMap { id in try value(of: id) }
+            let observedValues: [Observed<Value>] = try ids.compactMap { id in try value(for: id) }
             let currentValue: [Value] = observedValues.map { $0.value }
             let publishers: [AnyPublisher<Value, Never>] = observedValues.map { $0.objectWillChange }
             
