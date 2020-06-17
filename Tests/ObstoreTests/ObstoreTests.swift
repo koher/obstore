@@ -1,6 +1,6 @@
 import XCTest
-import Obstore
 import Combine
+import Obstore
 
 final class ObstoreTests: XCTestCase {
     func testExample() {
@@ -12,10 +12,10 @@ final class ObstoreTests: XCTestCase {
     func testBasics() {
         var cancellables: [AnyCancellable] = []
         
-        var foos: [String: Foo] = [:]
+        var database: [String: Foo] = [:]
         let subject: PassthroughSubject<Foo, Never> = .init()
-        subject.sink { foo in foos[foo.id] = foo }.store(in: &cancellables)
-        let store: Store<Foo> = .init(get : { id in foos[id] }, update: subject.eraseToAnyPublisher())
+        subject.sink { foo in database[foo.id] = foo }.store(in: &cancellables)
+        let store: Store<Foo> = .init(get : { id in database[id] }, update: subject.eraseToAnyPublisher())
         
         do {
             XCTAssertNil(try store.value(for: "a"))

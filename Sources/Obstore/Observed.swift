@@ -47,6 +47,7 @@ internal class CurrentValueObserved<Value>: Observed<Value> {
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 internal final class CombinedObserved<Value>: CurrentValueObserved<[Value]> {
+    private let observedValues: [Observed<Value>] // to keep references
     private let cancellables: [AnyCancellable]
 
     init(_ observedValues: [Observed<Value>]) {
@@ -63,6 +64,7 @@ internal final class CombinedObserved<Value>: CurrentValueObserved<[Value]> {
                 .store(in: &cancellables)
         }
         
+        self.observedValues = observedValues
         self.cancellables = cancellables
         
         super.init(subject)
