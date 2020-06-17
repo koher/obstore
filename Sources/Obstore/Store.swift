@@ -13,9 +13,9 @@ public final class Store<Value: Identifiable> {
     public init<DS: StoreDataSource>(_ dataSource: DS) where DS.Value == Value {
         self.dataSource = AnyStoreDataSource(dataSource)
         
-        updateCancellable = dataSource.publisher.sink { value in
-            queue.async { [weak self] in
-                guard let self = self else { return }
+        updateCancellable = dataSource.publisher.sink { [weak self] value in
+            guard let self = self else { return }
+            queue.sync {
                 guard let weakValue = self.observedValues[value.id] else { return }
                 guard let observedValue = weakValue.value else {
                     self.observedValues.removeValue(forKey: value.id)
