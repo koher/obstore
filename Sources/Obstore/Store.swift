@@ -28,37 +28,30 @@ public final class Store<Value: Identifiable> {
     
     public func value(for id: Value.ID) throws -> Observed<Value>? {
         try queue.sync {
-            if let weakValue = observedValues[id] {
-                if let value = weakValue.value {
-                    return value
-                } else {
-                    observedValues.removeValue(forKey: id)
-                }
-            }
-            
-            guard let value = try get(id) else { return nil }
-            
-            let observedValue = CurrentValueObserved(CurrentValueSubject(value))
-            observedValues[id] = Weak(observedValue)
-            return observedValue
+            try valueWithoutSync(for: id)
         }
+    }
+    
+    private func valueWithoutSync(for id: Value.ID) throws -> Observed<Value>? {
+        if let weakValue = observedValues[id] {
+            if let value = weakValue.value {
+                return value
+            } else {
+                observedValues.removeValue(forKey: id)
+            }
+        }
+        
+        guard let value = try get(id) else { return nil }
+        
+        let observedValue = CurrentValueObserved(CurrentValueSubject(value))
+        observedValues[id] = Weak(observedValue)
+        return observedValue
     }
     
     public func values<IDS: Collection>(for ids: IDS) throws -> Observed<[Value]> where IDS.Element == Value.ID {
         try queue.sync {
-            let observedValues: [Observed<Value>] = try ids.compactMap { id in try value(for: id) }
-            let currentValue: [Value] = observedValues.map { $0.value }
-            let publishers: [AnyPublisher<Value, Never>] = observedValues.map { $0.objectWillChange }
-            
-            var mergedPublisher: AnyPublisher<[Value], Never> = .init(Just([]))
-            for publisher in publishers {
-                mergedPublisher = mergedPublisher
-                    .combineLatest(publisher)
-                    .map { $0 + [$1] }
-                    .eraseToAnyPublisher()
-            }
-            
-            return AnyObserved(currentValue, publisher: mergedPublisher)
+            let observedValues: [Observed<Value>] = try ids.compactMap { id in try valueWithoutSync(for: id) }
+            return CombinedObserved(observedValues)
         }
     }
 }

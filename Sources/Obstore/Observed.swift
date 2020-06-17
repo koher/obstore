@@ -2,6 +2,7 @@ import Combine
 import Dispatch
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@dynamicMemberLookup
 public class Observed<Value>: ObservableObject {
     internal init() {}
     
@@ -12,10 +13,14 @@ public class Observed<Value>: ObservableObject {
     public var objectWillChange: AnyPublisher<Value, Never> {
         fatalError("Abstract")
     }
+    
+    public subscript<Subject>(dynamicMember keyPath: KeyPath<Value, Subject>) -> Subject {
+        value[keyPath: keyPath]
+    }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-internal final class CurrentValueObserved<Value>: Observed<Value> {
+internal class CurrentValueObserved<Value>: Observed<Value> {
     private let subject: CurrentValueSubject<Value, Never>
     private let publisher: AnyPublisher<Value, Never>
     
@@ -23,6 +28,7 @@ internal final class CurrentValueObserved<Value>: Observed<Value> {
         self.subject = subject
         self.publisher = subject
             .receive(on: DispatchQueue.main)
+            .dropFirst()
             .share()
             .eraseToAnyPublisher()
         
@@ -40,25 +46,25 @@ internal final class CurrentValueObserved<Value>: Observed<Value> {
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
-internal final class AnyObserved<Value>: Observed<Value> {
-    private let publisher: AnyPublisher<Value, Never>
-    
-    private var currentValue: Value
-    private var cancellable: AnyCancellable? = nil
+internal final class CombinedObserved<Value>: CurrentValueObserved<[Value]> {
+    private let cancellables: [AnyCancellable]
 
-    init(_ value: Value, publisher: AnyPublisher<Value, Never>) {
-        self.currentValue = value
-        self.publisher = publisher
+    init(_ observedValues: [Observed<Value>]) {
+        let currentValue: [Value] = observedValues.map { $0.value }
         
-        super.init()
+        let subject: CurrentValueSubject<[Value], Never> = .init(currentValue)
+        var cancellables: [AnyCancellable] = []
         
-        cancellable = publisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in
-                self?.currentValue = value
-            }
+        for (i, observedValue) in observedValues.enumerated() {
+            observedValue.objectWillChange
+                .sink { value in
+                    subject.value[i] = value
+                }
+                .store(in: &cancellables)
+        }
+        
+        self.cancellables = cancellables
+        
+        super.init(subject)
     }
-    
-    override var value: Value { currentValue }
-    override var objectWillChange: AnyPublisher<Value, Never> { publisher }
 }
