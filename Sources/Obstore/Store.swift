@@ -58,9 +58,11 @@ public final class Store<Value: Identifiable> {
 
 public protocol StoreDataSource {
     associatedtype Value: Identifiable
+    associatedtype ValuePublisher: Publisher
+        where ValuePublisher.Output == Value, ValuePublisher.Failure == Never
     
     func value(for id: Value.ID) throws -> Value?
-    var publisher: AnyPublisher<Value, Never> { get }
+    var publisher: ValuePublisher { get }
 }
 
 internal struct AnyStoreDataSource<Value: Identifiable>: StoreDataSource {
@@ -69,7 +71,7 @@ internal struct AnyStoreDataSource<Value: Identifiable>: StoreDataSource {
     
     init<DS: StoreDataSource>(_ source: DS) where DS.Value == Value {
         self.valueFor = { id in try source.value(for: id) }
-        self.publisher = source.publisher
+        self.publisher = source.publisher.eraseToAnyPublisher()
     }
     
     func value(for id: Value.ID) throws -> Value? {
