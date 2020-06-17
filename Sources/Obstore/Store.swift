@@ -6,13 +6,14 @@ private let queue: DispatchQueue = .init(label: "org.koherent.Obstore.Store")
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public final class Store<Value: Identifiable> {
     private let get: (Value.ID) throws -> Value?
-    
+    private var updateCancellable: AnyCancellable?
+
     private var observedValues: [Value.ID: Weak<(CurrentValueObserved<Value>)>] = [:]
     
-    public init(get: @escaping (Value.ID) throws -> Value?, update: @escaping ((Value) -> Void) -> Void) {
+    public init(get: @escaping (Value.ID) throws -> Value?, update: AnyPublisher<Value, Never>) {
         self.get = get
         
-        update { value in
+        updateCancellable = update.sink { value in
             queue.async { [weak self] in
                 guard let self = self else { return }
                 guard let weakValue = self.observedValues[value.id] else { return }
