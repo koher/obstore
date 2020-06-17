@@ -10,17 +10,13 @@ final class ObstoreTests: XCTestCase {
     }
     
     func testBasics() {
-        var cancellables: [AnyCancellable] = []
-        
-        var database: [String: Foo] = [:]
-        let subject: PassthroughSubject<Foo, Never> = .init()
-        subject.sink { foo in database[foo.id] = foo }.store(in: &cancellables)
-        let store: Store<Foo> = .init(get : { id in database[id] }, update: subject.eraseToAnyPublisher())
+        let dataSource: TestStoreDataSource<Foo> = .init()
+        let store: Store<Foo> = .init(dataSource)
         
         do {
             XCTAssertNil(try store.value(for: "a"))
             
-            subject.send(Foo(id: "a", bar: 2))
+            dataSource.set(Foo(id: "a", bar: 2))
             
             guard let a = try store.value(for: "a") else {
                 XCTFail()
@@ -38,7 +34,7 @@ final class ObstoreTests: XCTestCase {
                     expectation1.fulfill()
                 }
 
-            subject.send(Foo(id: "a", bar: 3))
+            dataSource.set(Foo(id: "a", bar: 3))
             
             wait(for: [expectation1], timeout: 2.0)
             cancellable1.cancel()
@@ -53,7 +49,7 @@ final class ObstoreTests: XCTestCase {
             }
             XCTAssertTrue(a === a2)
 
-            subject.send(Foo(id: "b", bar: 5))
+            dataSource.set(Foo(id: "b", bar: 5))
             
             guard let b = try store.value(for: "b") else {
                 XCTFail()
@@ -79,7 +75,7 @@ final class ObstoreTests: XCTestCase {
                     expectation2.fulfill()
                 }
 
-            subject.send(Foo(id: "b", bar: 7))
+            dataSource.set(Foo(id: "b", bar: 7))
 
             wait(for: [expectation2], timeout: 2.0)
             cancellable2.cancel()
@@ -101,4 +97,25 @@ final class ObstoreTests: XCTestCase {
 struct Foo: Identifiable {
     let id: String
     var bar: Int
+}
+
+final class TestStoreDataSource<Value: Identifiable>: StoreDataSource {
+    private var data: [Value.ID: Value]
+    private let subject: PassthroughSubject<Value, Never> = .init()
+    
+    init(_ data: [Value.ID: Value] = [:]) {
+        self.data = data
+        self.publisher = subject.eraseToAnyPublisher()
+    }
+    
+    func value(for id: Value.ID) throws -> Value? {
+        data[id]
+    }
+    
+    let publisher: AnyPublisher<Value, Never>
+    
+    func set(_ value: Value) {
+        data[value.id] = value
+        subject.send(value)
+    }
 }

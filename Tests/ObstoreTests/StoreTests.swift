@@ -4,15 +4,11 @@ import Obstore
 
 final class StoreTests: XCTestCase {
     func testStrongReferences() {
-        var cancellables: [AnyCancellable] = []
-        
-        var database: [String: Foo] = [
+        let dataSource: TestStoreDataSource<Foo> = .init([
             "a": Foo(id: "a", bar: 2),
             "b": Foo(id: "b", bar: 5),
-        ]
-        let subject: PassthroughSubject<Foo, Never> = .init()
-        subject.sink { foo in database[foo.id] = foo }.store(in: &cancellables)
-        let store: Store<Foo> = .init(get : { id in database[id] }, update: subject.eraseToAnyPublisher())
+        ])
+        let store: Store<Foo> = .init(dataSource)
 
         do {
             do {
