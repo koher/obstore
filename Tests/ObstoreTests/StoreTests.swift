@@ -12,29 +12,24 @@ final class StoreTests: XCTestCase {
 
         do {
             do {
-                guard let a1 = try store.value(for: "a") else {
-                    XCTFail()
-                    return
-                }
-                guard let a2 = try store.value(for: "a") else {
-                    XCTFail()
-                    return
-                }
+                let a1 = try store.value(for: "a")
+                let a2 = try store.value(for: "a")
                 XCTAssertTrue(a1 === a2)
             }
             
             do {
-                weak var a1: Observed<Foo>?
+                weak var a: Observed<Foo?>?
                 do {
-                    let a2 = try store.value(for: "a")
-                    a1 = try store.value(for: "a")
-                    XCTAssertTrue(a1! === a2)
+                    try withExtendedLifetime(try store.value(for: "a")) { _ in
+                        a = try store.value(for: "a")
+                        XCTAssertNotNil(a)
+                    }
                 }
-                XCTAssertNil(a1)
+                XCTAssertNil(a)
             }
             
             do {
-                weak var a: Observed<Foo>?
+                weak var a: Observed<Foo?>?
                 do {
                     try withExtendedLifetime(try store.values(for: ["b", "a"])) { _ in
                         a = try store.value(for: "a")

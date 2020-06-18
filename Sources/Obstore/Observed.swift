@@ -47,26 +47,26 @@ internal class CurrentValueObserved<Value>: Observed<Value> {
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 internal final class CombinedObserved<Value>: CurrentValueObserved<[Value]> {
-    private let observedValues: [Observed<Value>] // to keep references
-    private let cancellables: [AnyCancellable]
+    private let observedValues: [Observed<Value?>] // to keep references
+    private var cancellables: [AnyCancellable]
 
-    init(_ observedValues: [Observed<Value>]) {
-        let currentValue: [Value] = observedValues.map { $0.value }
+    init(_ observedValues: [Observed<Value?>]) {
+        self.observedValues = observedValues
+        cancellables = []
+
+        let currentValues: [Value] = observedValues.compactMap { $0.value }
+        let subject: CurrentValueSubject<[Value], Never> = .init(currentValues)
+
+        super.init(subject)
         
-        let subject: CurrentValueSubject<[Value], Never> = .init(currentValue)
-        var cancellables: [AnyCancellable] = []
-        
-        for (i, observedValue) in observedValues.enumerated() {
+        for observedValue in observedValues {
             observedValue.objectWillChange
-                .sink { value in
-                    subject.value[i] = value
+                .sink { [weak self] _ in
+                    guard let self = self else { return }
+                    let values: [Value] = self.observedValues.compactMap { $0.value }
+                    subject.value = values
                 }
                 .store(in: &cancellables)
         }
-        
-        self.observedValues = observedValues
-        self.cancellables = cancellables
-        
-        super.init(subject)
     }
 }
